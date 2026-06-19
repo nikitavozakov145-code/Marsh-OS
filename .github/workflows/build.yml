@@ -19,11 +19,13 @@ jobs:
             unzip wget cpio rsync mtools xorriso isolinux
 
       - name: Download Buildroot
-        run: |
-          wget https://buildroot.org/downloads/buildroot-2024.02.9.tar.gz
-          tar xf buildroot-*.tar.gz
-          mv buildroot-* buildroot
-
+  run: |
+    wget https://buildroot.org/downloads/buildroot-2024.02.9.tar.gz
+    tar xf buildroot-2024.02.9.tar.gz
+    # Если buildroot уже существует как файл — удалим
+    rm -rf buildroot
+    mv buildroot-2024.02.9 buildroot
+    
       - name: Prepare configuration
         run: |
           cp marsh_defconfig buildroot/configs/marsh_defconfig
