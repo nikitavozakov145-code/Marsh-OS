@@ -1,0 +1,52 @@
+name: Build Marsh OS ISO
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:   # позволяет запускать вручную из интерфейса GitHub
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bc bison flex libssl-dev libncurses-dev \
+            unzip wget cpio rsync mtools xorriso isolinux
+
+      - name: Download Buildroot
+        run: |
+          wget https://buildroot.org/downloads/buildroot-2024.02.9.tar.gz
+          tar xf buildroot-*.tar.gz
+          mv buildroot-* buildroot
+
+      - name: Prepare configuration
+        run: |
+          cp marsh_defconfig buildroot/configs/marsh_defconfig
+          # Копируем кастомные файлы (isolinux, post-build) в buildroot
+          mkdir -p buildroot/board/marsh
+          cp -r board/marsh/* buildroot/board/marsh/
+
+      - name: Configure Buildroot
+        run: |
+          cd buildroot
+          make marsh_defconfig
+          # Включаем скрипт пост-обработки (необходимо указать в конфиге, но проще пропатчить)
+          # Добавим путь к post-build скрипту в .config, если не записан в defconfig
+          echo "BR2_ROOTFS_POST_BUILD_SCRIPT=\"board/marsh/post-build.sh\"" >> .config
+          make olddefconfig
+
+      - name: Build
+        run: |
+          cd buildroot
+          make -j$(nproc)
+
+      - name: Upload ISO artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: marsh-os-iso
+          path: buildroot/output/images/*.iso
