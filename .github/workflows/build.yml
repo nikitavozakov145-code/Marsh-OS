@@ -10,19 +10,11 @@ jobs:
       - name: Install tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y squashfs-tools xorriso isolinux mtools wget curl
+          sudo apt-get install -y squashfs-tools xorriso isolinux mtools wget
 
-      - name: Get latest Void ISO URL
+      - name: Download Void Linux ISO
         run: |
-          # Получаем список файлов и ищем последний base ISO
-          BASE_URL="https://repo-default.voidlinux.org/live/current"
-          LATEST_FILE=$(curl -s "$BASE_URL/" | grep -oP 'href="void-live-x86_64-\d{8}\.iso"' | tail -1 | cut -d'"' -f2)
-          if [ -z "$LATEST_FILE" ]; then
-            echo "Не удалось найти ISO-файл. Использую запасной вариант."
-            LATEST_FILE="void-live-x86_64-20240314.iso"
-          fi
-          echo "Скачиваю: $BASE_URL/$LATEST_FILE"
-          wget -O void.iso "$BASE_URL/$LATEST_FILE"
+          wget -O void.iso https://repo-default.voidlinux.org/live/current/void-live-x86_64-20250601.iso
 
       - name: Extract and rebrand
         run: |
@@ -34,16 +26,13 @@ jobs:
           cd marsh-iso
           sudo unsquashfs -d ../rootfs live/rootfs.squashfs
 
-          # Меняем имя системы
           sudo sed -i 's/NAME="void"/NAME="marsh"/' ../rootfs/etc/os-release
           sudo sed -i 's/ID=void/ID=marsh/' ../rootfs/etc/os-release
           sudo sed -i 's/PRETTY_NAME="Void Linux"/PRETTY_NAME="Marsh OS"/' ../rootfs/etc/os-release
           echo "Marsh OS \\r \\l" | sudo tee ../rootfs/etc/issue
 
-          # Пересобираем squashfs
           sudo mksquashfs ../rootfs live/rootfs.squashfs -comp xz -noappend
 
-          # Правим загрузчик
           sudo sed -i 's/Void Linux/Marsh OS/g' boot/grub/grub.cfg
           sudo sed -i 's/Void/Marsh/g' isolinux/isolinux.cfg
 
