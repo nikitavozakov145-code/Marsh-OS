@@ -62,10 +62,10 @@ jobs:
       - name: Build
         run: |
           cd buildroot
-          make -j$(nproc)
+          make
 
-      - name: Upload ISO
+      - name: Upload ISO Artifact
         uses: actions/upload-artifact@v4
         with:
           name: marsh-os-iso
-          path: buildroot/output/images/*.iso
+          path: buildroot/output/images/rootfs.iso9660
