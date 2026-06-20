@@ -10,11 +10,21 @@ jobs:
       - name: Install tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y squashfs-tools xorriso isolinux mtools wget
+          sudo apt-get install -y squashfs-tools xorriso isolinux mtools wget curl grep
 
-      - name: Download Void Linux ISO
+      - name: Get latest Void ISO URL
         run: |
-          wget -O void.iso https://repo-default.voidlinux.org/live/current/void-live-x86_64-20250601.iso
+          BASE_URL="https://repo-default.voidlinux.org/live/current"
+          # Загружаем список файлов (вывод в HTML, ищем строки с iso)
+          INDEX=$(curl -s "$BASE_URL/")
+          # Ищем все href, заканчивающиеся на .iso, фильтруем x86_64, сортируем, берём последний
+          LATEST_FILE=$(echo "$INDEX" | grep -oP 'href="\K[^"]*\.iso' | grep 'void-live-x86_64' | sort | tail -1)
+          if [ -z "$LATEST_FILE" ]; then
+            echo "Не удалось найти ISO-файл. Прерываю."
+            exit 1
+          fi
+          echo "Найден файл: $LATEST_FILE"
+          wget -O void.iso "$BASE_URL/$LATEST_FILE"
 
       - name: Extract and rebrand
         run: |
