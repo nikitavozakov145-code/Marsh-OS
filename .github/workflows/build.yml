@@ -15,7 +15,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y bc bison flex libssl-dev libncurses-dev unzip wget cpio rsync mtools xorriso isolinux
+          sudo apt-get install -y bc bison flex libssl-dev libncurses-dev unzip wget cpio rsync mtools xorriso isolinux libelf-dev
 
       - name: Download Buildroot
         run: |
