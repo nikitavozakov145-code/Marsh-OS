@@ -15,12 +15,10 @@ jobs:
       - name: Get latest Void ISO URL
         run: |
           BASE_URL="https://repo-default.voidlinux.org/live/current"
-          # Загружаем список файлов (вывод в HTML, ищем строки с iso)
           INDEX=$(curl -s "$BASE_URL/")
-          # Ищем все href, заканчивающиеся на .iso, фильтруем x86_64, сортируем, берём последний
           LATEST_FILE=$(echo "$INDEX" | grep -oP 'href="\K[^"]*\.iso' | grep 'void-live-x86_64' | sort | tail -1)
           if [ -z "$LATEST_FILE" ]; then
-            echo "Не удалось найти ISO-файл. Прерываю."
+            echo "Не удалось найти ISO-файл."
             exit 1
           fi
           echo "Найден файл: $LATEST_FILE"
@@ -30,19 +28,24 @@ jobs:
         run: |
           mkdir iso mnt rootfs marsh-iso
           sudo mount -o loop void.iso mnt
-          cp -r mnt/* marsh-iso/
+          # Копируем содержимое ISO с сохранением прав (sudo)
+          sudo cp -a mnt/. marsh-iso/
           sudo umount mnt
 
           cd marsh-iso
+          # Распаковываем корневую ФС с sudo
           sudo unsquashfs -d ../rootfs live/rootfs.squashfs
 
+          # Меняем название в файлах (нужен sudo для записи)
           sudo sed -i 's/NAME="void"/NAME="marsh"/' ../rootfs/etc/os-release
           sudo sed -i 's/ID=void/ID=marsh/' ../rootfs/etc/os-release
           sudo sed -i 's/PRETTY_NAME="Void Linux"/PRETTY_NAME="Marsh OS"/' ../rootfs/etc/os-release
           echo "Marsh OS \\r \\l" | sudo tee ../rootfs/etc/issue
 
+          # Пересоздаём squashfs
           sudo mksquashfs ../rootfs live/rootfs.squashfs -comp xz -noappend
 
+          # Правим загрузчик
           sudo sed -i 's/Void Linux/Marsh OS/g' boot/grub/grub.cfg
           sudo sed -i 's/Void/Marsh/g' isolinux/isolinux.cfg
 
