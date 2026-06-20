@@ -33,7 +33,6 @@ jobs:
 
           cd marsh-iso
 
-          # Распаковываем squashfs с ext4-образом
           sudo unsquashfs -d ../rootfs-squash LiveOS/squashfs.img
           EXT4_IMG=$(ls ../rootfs-squash/LiveOS/ext3fs.img 2>/dev/null || ls ../rootfs-squash/rootfs.img 2>/dev/null || ls ../rootfs-squash/*.img 2>/dev/null)
           echo "Найден образ ext4: $EXT4_IMG"
@@ -41,7 +40,6 @@ jobs:
           mkdir -p ../rootfs-ext4
           sudo mount -o loop "$EXT4_IMG" ../rootfs-ext4
 
-          # Меняем название ОС
           sudo sed -i 's/NAME="void"/NAME="marsh"/' ../rootfs-ext4/etc/os-release
           sudo sed -i 's/ID=void/ID=marsh/' ../rootfs-ext4/etc/os-release
           sudo sed -i 's/PRETTY_NAME="Void Linux"/PRETTY_NAME="Marsh OS"/' ../rootfs-ext4/etc/os-release
@@ -49,11 +47,9 @@ jobs:
 
           sudo umount ../rootfs-ext4
 
-          # Пересобираем squashfs.img
           sudo rm LiveOS/squashfs.img
           sudo mksquashfs ../rootfs-squash LiveOS/squashfs.img -comp xz -noappend
 
-          # Пробуем исправить загрузчик, но если файлов нет — игнорируем
           if [ -f boot/grub/grub.cfg ]; then
             sudo sed -i 's/Void Linux/Marsh OS/g' boot/grub/grub.cfg
           fi
@@ -67,6 +63,8 @@ jobs:
       - name: Create new ISO
         run: |
           cd marsh-iso
+          # Даём права на чтение всем файлам, чтобы xorriso мог их прочитать
+          sudo chmod -R a+rX .
           xorriso -as mkisofs \
             -iso-level 3 \
             -full-iso9660-filenames \
