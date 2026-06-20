@@ -33,16 +33,15 @@ jobs:
 
           cd marsh-iso
 
-          # 1. Извлекаем ext4-образ из squashfs
+          # Распаковываем squashfs с ext4-образом
           sudo unsquashfs -d ../rootfs-squash LiveOS/squashfs.img
-          # Теперь ../rootfs-squash содержит файл типа "rootfs" (ext4-образ)
-          EXT4_IMG=$(ls ../rootfs-squash/LiveOS/ext3fs.img 2>/dev/null || ls ../rootfs-squash/rootfs.img 2>/dev/null || ls ../rootfs-squash/*.img)
+          EXT4_IMG=$(ls ../rootfs-squash/LiveOS/ext3fs.img 2>/dev/null || ls ../rootfs-squash/rootfs.img 2>/dev/null || ls ../rootfs-squash/*.img 2>/dev/null)
           echo "Найден образ ext4: $EXT4_IMG"
 
-          # 2. Монтируем ext4-образ и правим файлы
           mkdir -p ../rootfs-ext4
           sudo mount -o loop "$EXT4_IMG" ../rootfs-ext4
 
+          # Меняем название ОС
           sudo sed -i 's/NAME="void"/NAME="marsh"/' ../rootfs-ext4/etc/os-release
           sudo sed -i 's/ID=void/ID=marsh/' ../rootfs-ext4/etc/os-release
           sudo sed -i 's/PRETTY_NAME="Void Linux"/PRETTY_NAME="Marsh OS"/' ../rootfs-ext4/etc/os-release
@@ -50,13 +49,20 @@ jobs:
 
           sudo umount ../rootfs-ext4
 
-          # 3. Пересобираем squashfs.img
+          # Пересобираем squashfs.img
           sudo rm LiveOS/squashfs.img
           sudo mksquashfs ../rootfs-squash LiveOS/squashfs.img -comp xz -noappend
 
-          # 4. Правим загрузчик (название в меню)
-          sudo sed -i 's/Void Linux/Marsh OS/g' boot/grub/grub.cfg boot/grub/grub_void.cfg 2>/dev/null || true
-          sudo sed -i 's/Void/Marsh/g' isolinux/isolinux.cfg
+          # Пробуем исправить загрузчик, но если файлов нет — игнорируем
+          if [ -f boot/grub/grub.cfg ]; then
+            sudo sed -i 's/Void Linux/Marsh OS/g' boot/grub/grub.cfg
+          fi
+          if [ -f boot/grub/grub_void.cfg ]; then
+            sudo sed -i 's/Void Linux/Marsh OS/g' boot/grub/grub_void.cfg
+          fi
+          if [ -f isolinux/isolinux.cfg ]; then
+            sudo sed -i 's/Void/Marsh/g' isolinux/isolinux.cfg
+          fi
 
       - name: Create new ISO
         run: |
