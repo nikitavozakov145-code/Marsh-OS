@@ -1,4 +1,4 @@
-name: Build Marsh OS (Void rebrand) - диагностика
+name: Build Marsh OS (Void rebrand)
 
 on:
   workflow_dispatch:
@@ -10,7 +10,7 @@ jobs:
       - name: Install tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y squashfs-tools xorriso isolinux mtools wget curl grep
+          sudo apt-get install -y squashfs-tools xorriso isolinux mtools wget curl grep e2fsprogs
 
       - name: Get latest Void ISO URL
         run: |
@@ -24,16 +24,56 @@ jobs:
           echo "Найден файл: $LATEST_FILE"
           wget -O void.iso "$BASE_URL/$LATEST_FILE"
 
-      - name: Diagnostic - show ISO contents
+      - name: Extract and rebrand
         run: |
-          mkdir mnt
+          mkdir -p iso mnt rootfs-ext4 marsh-iso
           sudo mount -o loop void.iso mnt
-          echo "=== Содержимое ISO ==="
-          find mnt -type f | head -40
-          echo "=== squashfs / initrd ==="
-          find mnt -name "*.squashfs" -o -name "*.img" -o -name "initrd*" 2>/dev/null
+          sudo cp -a mnt/. marsh-iso/
           sudo umount mnt
-          # Останавливаем, чтобы увидеть вывод
-          exit 0
 
-      # Дальнейшие шаги пока пропущены — добавим после уточнения структуры.
+          cd marsh-iso
+
+          # 1. Извлекаем ext4-образ из squashfs
+          sudo unsquashfs -d ../rootfs-squash LiveOS/squashfs.img
+          # Теперь ../rootfs-squash содержит файл типа "rootfs" (ext4-образ)
+          EXT4_IMG=$(ls ../rootfs-squash/LiveOS/ext3fs.img 2>/dev/null || ls ../rootfs-squash/rootfs.img 2>/dev/null || ls ../rootfs-squash/*.img)
+          echo "Найден образ ext4: $EXT4_IMG"
+
+          # 2. Монтируем ext4-образ и правим файлы
+          mkdir -p ../rootfs-ext4
+          sudo mount -o loop "$EXT4_IMG" ../rootfs-ext4
+
+          sudo sed -i 's/NAME="void"/NAME="marsh"/' ../rootfs-ext4/etc/os-release
+          sudo sed -i 's/ID=void/ID=marsh/' ../rootfs-ext4/etc/os-release
+          sudo sed -i 's/PRETTY_NAME="Void Linux"/PRETTY_NAME="Marsh OS"/' ../rootfs-ext4/etc/os-release
+          echo "Marsh OS \\r \\l" | sudo tee ../rootfs-ext4/etc/issue
+
+          sudo umount ../rootfs-ext4
+
+          # 3. Пересобираем squashfs.img
+          sudo rm LiveOS/squashfs.img
+          sudo mksquashfs ../rootfs-squash LiveOS/squashfs.img -comp xz -noappend
+
+          # 4. Правим загрузчик (название в меню)
+          sudo sed -i 's/Void Linux/Marsh OS/g' boot/grub/grub.cfg boot/grub/grub_void.cfg 2>/dev/null || true
+          sudo sed -i 's/Void/Marsh/g' isolinux/isolinux.cfg
+
+      - name: Create new ISO
+        run: |
+          cd marsh-iso
+          xorriso -as mkisofs \
+            -iso-level 3 \
+            -full-iso9660-filenames \
+            -volid "MARSH_OS" \
+            -eltorito-boot isolinux/isolinux.bin \
+            -eltorito-catalog isolinux/boot.cat \
+            -no-emul-boot -boot-load-size 4 -boot-info-table \
+            -isohybrid-mbr /usr/lib/ISOLINUX/isohdpfx.bin \
+            -eltorito-alt-boot -e boot/efi.img -no-emul-boot -isohybrid-gpt-basdat \
+            -output ../marsh-os.iso .
+
+      - name: Upload ISO
+        uses: actions/upload-artifact@v4
+        with:
+          name: marsh-os-iso
+          path: marsh-os.iso
