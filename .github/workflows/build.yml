@@ -1,4 +1,4 @@
-name: Build Marsh OS (Void rebrand)
+name: Build Marsh OS (Void rebrand) - диагностика
 
 on:
   workflow_dispatch:
@@ -24,47 +24,16 @@ jobs:
           echo "Найден файл: $LATEST_FILE"
           wget -O void.iso "$BASE_URL/$LATEST_FILE"
 
-      - name: Extract and rebrand
+      - name: Diagnostic - show ISO contents
         run: |
-          mkdir iso mnt rootfs marsh-iso
+          mkdir mnt
           sudo mount -o loop void.iso mnt
-          # Копируем содержимое ISO с сохранением прав (sudo)
-          sudo cp -a mnt/. marsh-iso/
+          echo "=== Содержимое ISO ==="
+          find mnt -type f | head -40
+          echo "=== squashfs / initrd ==="
+          find mnt -name "*.squashfs" -o -name "*.img" -o -name "initrd*" 2>/dev/null
           sudo umount mnt
+          # Останавливаем, чтобы увидеть вывод
+          exit 0
 
-          cd marsh-iso
-          # Распаковываем корневую ФС с sudo
-          sudo unsquashfs -d ../rootfs live/rootfs.squashfs
-
-          # Меняем название в файлах (нужен sudo для записи)
-          sudo sed -i 's/NAME="void"/NAME="marsh"/' ../rootfs/etc/os-release
-          sudo sed -i 's/ID=void/ID=marsh/' ../rootfs/etc/os-release
-          sudo sed -i 's/PRETTY_NAME="Void Linux"/PRETTY_NAME="Marsh OS"/' ../rootfs/etc/os-release
-          echo "Marsh OS \\r \\l" | sudo tee ../rootfs/etc/issue
-
-          # Пересоздаём squashfs
-          sudo mksquashfs ../rootfs live/rootfs.squashfs -comp xz -noappend
-
-          # Правим загрузчик
-          sudo sed -i 's/Void Linux/Marsh OS/g' boot/grub/grub.cfg
-          sudo sed -i 's/Void/Marsh/g' isolinux/isolinux.cfg
-
-      - name: Create new ISO
-        run: |
-          cd marsh-iso
-          xorriso -as mkisofs \
-            -iso-level 3 \
-            -full-iso9660-filenames \
-            -volid "MARSH_OS" \
-            -eltorito-boot isolinux/isolinux.bin \
-            -eltorito-catalog isolinux/boot.cat \
-            -no-emul-boot -boot-load-size 4 -boot-info-table \
-            -isohybrid-mbr /usr/lib/ISOLINUX/isohdpfx.bin \
-            -eltorito-alt-boot -e boot/efi.img -no-emul-boot -isohybrid-gpt-basdat \
-            -output ../marsh-os.iso .
-
-      - name: Upload ISO
-        uses: actions/upload-artifact@v4
-        with:
-          name: marsh-os-iso
-          path: marsh-os.iso
+      # Дальнейшие шаги пока пропущены — добавим после уточнения структуры.
