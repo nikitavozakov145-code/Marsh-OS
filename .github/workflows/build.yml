@@ -15,7 +15,29 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y bc bison flex libssl-dev libncurses-dev unzip wget cpio rsync mtools xorriso isolinux libelf-dev
+          sudo apt-get install -y \
+            bc \
+            bison \
+            flex \
+            libssl-dev \
+            libncurses-dev \
+            unzip \
+            wget \
+            cpio \
+            rsync \
+            mtools \
+            xorriso \
+            isolinux \
+            libelf-dev \
+            libgmp-dev \
+            libmpc-dev \
+            libmpfr-dev \
+            gcc \
+            g++ \
+            make \
+            perl \
+            git \
+            file
 
       - name: Download Buildroot
         run: |
@@ -34,7 +56,7 @@ jobs:
         run: |
           cd buildroot
           make marsh_defconfig
-          echo "BR2_ROOTFS_POST_BUILD_SCRIPT=\"board/marsh/post-build.sh\"" >> .config
+          echo 'BR2_ROOTFS_POST_BUILD_SCRIPT="board/marsh/post-build.sh"' >> .config
           make olddefconfig
 
       - name: Build
