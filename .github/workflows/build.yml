@@ -16,56 +16,46 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            bc \
-            bison \
-            flex \
-            libssl-dev \
+            build-essential \
             libncurses-dev \
+            rsync \
+            bc \
             unzip \
             wget \
             cpio \
-            rsync \
-            mtools \
-            xorriso \
-            isolinux \
+            python3 \
             libelf-dev \
-            libgmp-dev \
-            libmpc-dev \
-            libmpfr-dev \
-            gcc \
-            g++ \
-            make \
-            perl \
-            git \
-            file
+            libssl-dev \
+            bison \
+            flex \
+            git
 
       - name: Download Buildroot
         run: |
-          wget https://buildroot.org/downloads/buildroot-2024.02.9.tar.gz
-          tar xf buildroot-2024.02.9.tar.gz
-          rm -rf buildroot
-          mv buildroot-2024.02.9 buildroot
+          git clone --depth 1 --branch 2024.02.9 https://github.com/buildroot/buildroot.git buildroot
 
       - name: Prepare configuration
         run: |
           cp marsh_defconfig buildroot/configs/marsh_defconfig
           mkdir -p buildroot/board/marsh
-          cp -r board/marsh/* buildroot/board/marsh/
+          if [ -d "board/marsh" ]; then 
+            cp -r board/marsh/* buildroot/board/marsh/
+          fi
 
       - name: Configure Buildroot
         run: |
           cd buildroot
           make marsh_defconfig
+          sed -i '/BR2_ROOTFS_POST_BUILD_SCRIPT/d' .config
           echo 'BR2_ROOTFS_POST_BUILD_SCRIPT="board/marsh/post-build.sh"' >> .config
           make olddefconfig
+
+      - name: Download source packages
+        run: |
+          cd buildroot
+          make source
 
       - name: Build
         run: |
           cd buildroot
           make
-
-      - name: Upload ISO Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: marsh-os-iso
-          path: buildroot/output/images/rootfs.iso9660
