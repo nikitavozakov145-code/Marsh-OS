@@ -27,14 +27,15 @@ jobs:
           sudo mv LiveOS/squashfs.img LiveOS/squashfs_orig.img
           sudo unsquashfs -d LiveOS/squashfs LiveOS/squashfs_orig.img
           EXT4_FILE=$(ls LiveOS/squashfs/LiveOS/*.img 2>/dev/null)
-          mkdir mnt_ext4
+          # Исправлено: создаём папку для монтирования с sudo
+          sudo mkdir -p mnt_ext4
           sudo mount -o loop "$EXT4_FILE" mnt_ext4
           sudo sed -i 's/NAME="void"/NAME="marsh"/' mnt_ext4/etc/os-release
           sudo sed -i 's/ID=void/ID=marsh/' mnt_ext4/etc/os-release
           sudo sed -i 's/PRETTY_NAME="Void Linux"/PRETTY_NAME="Marsh OS"/' mnt_ext4/etc/os-release
           echo "Marsh OS \\r \\l" | sudo tee mnt_ext4/etc/issue
           sudo umount mnt_ext4
-          rmdir mnt_ext4
+          sudo rmdir mnt_ext4
           sudo rm LiveOS/squashfs_orig.img LiveOS/squashfs.img
           sudo mksquashfs LiveOS/squashfs LiveOS/squashfs.img -comp xz -noappend
           sudo rm -rf LiveOS/squashfs
