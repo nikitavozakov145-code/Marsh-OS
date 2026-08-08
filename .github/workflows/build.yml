@@ -17,7 +17,7 @@ jobs:
           echo "Downloading $FILE"
           wget -O void.iso "$URL/$FILE"
 
-      - name: Rebrand ISO
+      - name: Rebrand ISO (fix VOID_LIVE label)
         run: |
           mkdir mnt marsh-iso
           sudo mount -o loop void.iso mnt
@@ -25,21 +25,25 @@ jobs:
           sudo umount mnt
           cd marsh-iso
 
-          # Распаковываем оригинальный squashfs
+          # Распаковываем squashfs
           sudo mv LiveOS/squashfs.img LiveOS/squashfs_orig.img
           sudo unsquashfs -d LiveOS/squashfs LiveOS/squashfs_orig.img
-
-          # Находим ext4-образ (файл внутри squashfs)
           EXT4_FILE=$(ls LiveOS/squashfs/LiveOS/*.img 2>/dev/null | head -1)
           echo "Found ext4 image: $EXT4_FILE"
 
-          # Монтируем ext4-образ и меняем название
+          # Монтируем ext4-образ
           sudo mkdir -p mnt_ext4
           sudo mount -o loop "$EXT4_FILE" mnt_ext4
+
+          # Меняем бренд в системе
           sudo sed -i 's/NAME="void"/NAME="marsh"/' mnt_ext4/etc/os-release
           sudo sed -i 's/ID=void/ID=marsh/' mnt_ext4/etc/os-release
           sudo sed -i 's/PRETTY_NAME="Void Linux"/PRETTY_NAME="Marsh OS"/' mnt_ext4/etc/os-release
           echo "Marsh OS \\r \\l" | sudo tee mnt_ext4/etc/issue
+
+          # Заменяем метку VOID_LIVE на MARSH_OS во всех конфигах внутри системы (dracut, grub)
+          sudo find mnt_ext4 -type f \( -name "*.cfg" -o -name "*.conf" \) -exec sudo sed -i 's/VOID_LIVE/MARSH_OS/g' {} +
+
           sudo umount mnt_ext4
           sudo rmdir mnt_ext4
 
@@ -48,14 +52,15 @@ jobs:
           sudo mksquashfs LiveOS/squashfs LiveOS/squashfs.img -comp xz -noappend
           sudo rm -rf LiveOS/squashfs
 
-          # Заменяем имя в загрузочных меню
+          # Правим загрузочные меню: заменяем бренд + метку VOID_LIVE
           for f in boot/grub/grub.cfg boot/grub/grub_void.cfg isolinux/isolinux.cfg boot/isolinux/isolinux.cfg; do
             if [ -f "$f" ]; then
               sudo sed -i 's/Void Linux/Marsh OS/g; s/Void/Marsh/g' "$f"
+              sudo sed -i 's/VOID_LIVE/MARSH_OS/g' "$f"
             fi
           done
 
-      - name: Build ISO (BIOS)
+      - name: Build ISO (BIOS) with MARSH_OS label
         run: |
           cd marsh-iso
           sudo chmod -R a+rX .
