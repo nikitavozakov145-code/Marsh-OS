@@ -40,11 +40,13 @@ jobs:
           sudo sed -i 's/PRETTY_NAME="Void Linux"/PRETTY_NAME="Marsh OS"/' mnt_ext4/etc/os-release
           echo "Marsh OS \\r \\l" | sudo tee mnt_ext4/etc/issue
 
-          # Исправляем метку VOID_LIVE -> MARSH_OS
+          # Исправляем метку VOID_LIVE -> MARSH_OS во всех конфигах
           sudo find mnt_ext4 -type f \( -name "*.cfg" -o -name "*.conf" \) -exec sudo sed -i 's/VOID_LIVE/MARSH_OS/g' {} +
 
-          # Удаляем возможные musl-конфиги (оставляем только glibc)
-          sudo rm -f mnt_ext4/usr/share/xbps.d/*musl*.conf 2>/dev/null || true
+          # --- Фикс репозиториев: удаляем ВСЕ старые конфиги и создаём правильные для glibc ---
+          sudo rm -f mnt_ext4/usr/share/xbps.d/*.conf
+          echo 'repository=https://repo-default.voidlinux.org/current' | sudo tee mnt_ext4/usr/share/xbps.d/00-repository-main.conf
+          echo 'repository=https://repo-default.voidlinux.org/current/nonfree' | sudo tee mnt_ext4/usr/share/xbps.d/10-repository-nonfree.conf
 
           # Подготавливаем chroot
           sudo mount --bind /sys mnt_ext4/sys
@@ -52,23 +54,21 @@ jobs:
           sudo mount --bind /dev mnt_ext4/dev
           sudo cp /etc/resolv.conf mnt_ext4/etc/resolv.conf
 
-          # 1. Обновляем xbps (ОБЯЗАТЕЛЬНО!)
-          echo "Updating xbps..."
-          sudo chroot mnt_ext4 xbps-install -u xbps || { echo "xbps update failed"; exit 1; }
+          # Синхронизируем репозитории (теперь только glibc)
+          echo "Syncing repositories..."
+          sudo chroot mnt_ext4 xbps-install -S || { echo "xbps-install -S failed"; exit 1; }
 
-          # 2. Удаляем тяжёлые пакеты, если есть (Firefox уже удалён в логе, но для чистоты)
+          # Удаляем тяжёлые пакеты, если есть (Firefox уже может отсутствовать, но для чистоты)
           sudo chroot mnt_ext4 xbps-remove -Ry firefox libreoffice 2>/dev/null || true
 
-          # 3. Устанавливаем легковесный софт
+          # Устанавливаем легковесный софт
           echo "Installing lightweight apps..."
           sudo chroot mnt_ext4 xbps-install -Sy midori abiword gnumeric mpv
 
-          # 4. Отключаем ненужные службы
-          sudo chroot mnt_ext4 rm -f /var/service/bluetoothd
-          sudo chroot mnt_ext4 rm -f /var/service/cupsd
-          sudo chroot mnt_ext4 rm -f /var/service/avahi-daemon
+          # Отключаем ненужные службы
+          sudo chroot mnt_ext4 rm -f /var/service/bluetoothd /var/service/cupsd /var/service/avahi-daemon
 
-          # 5. Чистим кэш пакетов
+          # Чистим кэш пакетов
           sudo chroot mnt_ext4 xbps-remove -O
           sudo chroot mnt_ext4 rm -rf /var/cache/xbps
 
