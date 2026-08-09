@@ -1,4 +1,4 @@
-name: Build Marsh OS Light (optimized)
+name: Build Marsh OS Light (optimized, fixed xbps)
 
 on: workflow_dispatch
 
@@ -43,25 +43,32 @@ jobs:
           # Исправляем метку VOID_LIVE -> MARSH_OS
           sudo find mnt_ext4 -type f \( -name "*.cfg" -o -name "*.conf" \) -exec sudo sed -i 's/VOID_LIVE/MARSH_OS/g' {} +
 
+          # Удаляем возможные musl-конфиги (оставляем только glibc)
+          sudo rm -f mnt_ext4/usr/share/xbps.d/*musl*.conf 2>/dev/null || true
+
           # Подготавливаем chroot
           sudo mount --bind /sys mnt_ext4/sys
           sudo mount --bind /proc mnt_ext4/proc
           sudo mount --bind /dev mnt_ext4/dev
           sudo cp /etc/resolv.conf mnt_ext4/etc/resolv.conf
 
-          # Удаляем тяжёлые пакеты (если они были в базовом ISO)
-          # (в официальном XFCE ISO их обычно нет, но на всякий случай)
-          sudo chroot mnt_ext4 xbps-remove -Ry libreoffice firefox 2>/dev/null || true
+          # 1. Обновляем xbps (ОБЯЗАТЕЛЬНО!)
+          echo "Updating xbps..."
+          sudo chroot mnt_ext4 xbps-install -u xbps || { echo "xbps update failed"; exit 1; }
 
-          # Устанавливаем легковесный софт
+          # 2. Удаляем тяжёлые пакеты, если есть (Firefox уже удалён в логе, но для чистоты)
+          sudo chroot mnt_ext4 xbps-remove -Ry firefox libreoffice 2>/dev/null || true
+
+          # 3. Устанавливаем легковесный софт
+          echo "Installing lightweight apps..."
           sudo chroot mnt_ext4 xbps-install -Sy midori abiword gnumeric mpv
 
-          # Отключаем ненужные службы (Bluetooth, печать и т.д.)
+          # 4. Отключаем ненужные службы
           sudo chroot mnt_ext4 rm -f /var/service/bluetoothd
           sudo chroot mnt_ext4 rm -f /var/service/cupsd
           sudo chroot mnt_ext4 rm -f /var/service/avahi-daemon
 
-          # Чистим кэш пакетов для уменьшения размера
+          # 5. Чистим кэш пакетов
           sudo chroot mnt_ext4 xbps-remove -O
           sudo chroot mnt_ext4 rm -rf /var/cache/xbps
 
